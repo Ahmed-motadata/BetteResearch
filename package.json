@@ -2,7 +2,7 @@
   "name": "betteresearch",
   "version": "1.0.0",
   "description": "A web-based clipboard collection tool that stays on top of your screen. This overlay allows you to save multiple text snippets and easily copy them when needed.",
-  "main": "main.js",
+  "main": "app/main.js",
   "scripts": {
     "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1"

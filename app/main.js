@@ -2,10 +2,13 @@ const { app, BrowserWindow, Tray, Menu, clipboard, shell, nativeImage, globalSho
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+
+// Load DB connection early to ensure handlers have access
+require('../db/index');
 
 // Load IPC handlers (modularized)
-require('./ipc/handlers');
+require('../ipc/handlers');
 
 // Disable hardware acceleration
 app.disableHardwareAcceleration();
@@ -14,13 +17,27 @@ app.disableHardwareAcceleration();
 let mainWindow;
 let tray = null;
 
+function getValidIcon(iconPath, size = 256) {
+  let icon = nativeImage.createFromPath(iconPath);
+  if (icon.isEmpty()) {
+    console.warn('Icon not loaded:', iconPath);
+    return undefined;
+  }
+  // Resize if needed (Electron prefers 256x256 for app, 24x24 for tray)
+  return icon.resize({ width: size, height: size });
+}
+
+const iconPath = path.join(process.cwd(), 'src/icon256bit.png');
+const trayIconPath = path.join(process.cwd(), 'src/icon24bit.png');
+const appIcon = getValidIcon(iconPath, 256);
+const trayIcon = getValidIcon(trayIconPath, 24);
+
 // Create the clipboard widget window
 function createWindow() {
   // Get the screen size for positioning
   const { screen } = require('electron');
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width } = primaryDisplay.workAreaSize;
-  const iconPath = path.join(__dirname, 'icon.png');
   mainWindow = new BrowserWindow({
     width: 350,
     height: 450,
@@ -38,11 +55,11 @@ function createWindow() {
     alwaysOnTop: true, // Stay on top of other windows
     minWidth: 250,
     minHeight: 200,
-    icon: iconPath,
+    icon: appIcon,
   });
   
   // Load the index.html file
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
   
   // Uncomment to open DevTools for debugging
   // mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -76,13 +93,16 @@ function saveWindowBounds() {
 
 // Create system tray
 function createTray() {
-  const iconPath = path.join(__dirname, 'icon.png');
-  tray = new Tray(nativeImage.createFromPath(iconPath));
+  if (!trayIcon || trayIcon.isEmpty()) {
+    console.error('Tray icon not loaded or invalid:', trayIconPath);
+    return;
+  }
+  tray = new Tray(trayIcon);
 
   // Create a context menu for the tray
   const contextMenu = Menu.buildFromTemplate([
     { 
-      label: 'Show BetteResearch', 
+      label: 'Show Clipboard Widget', 
       click: () => {
         if (mainWindow === null) {
           createWindow();
@@ -92,7 +112,7 @@ function createTray() {
       }
     },
     { 
-      label: 'Hide BetteResearch', 
+      label: 'Hide Clipboard Widget', 
       click: () => {
         if (mainWindow !== null) {
           mainWindow.hide();
@@ -127,13 +147,12 @@ function createTray() {
 // Create the window when the app is ready
 app.whenReady().then(() => {
   // Set the app icon for Linux/Windows
-  const iconPath = path.join(__dirname, 'icon.png');
-  if (process.platform === 'linux' && app.setIcon) {
-    app.setIcon(iconPath);
+  if (process.platform === 'linux' && app.setIcon && appIcon) {
+    app.setIcon(appIcon);
   }
   // Set the app icon for macOS
-  if (process.platform === 'darwin' && app.dock && app.dock.setIcon) {
-    app.dock.setIcon(iconPath);
+  if (process.platform === 'darwin' && app.dock && app.dock.setIcon && appIcon) {
+    app.dock.setIcon(appIcon);
   }
   createWindow();
   createTray();

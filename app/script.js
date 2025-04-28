@@ -1,3 +1,6 @@
+import { createClipboardItem, loadClipboardItems, loadClipboardItemsFromDB, saveClipboardItems } from './clipboard.js';
+import { showNotification } from '../renderer/utils.js';
+
 document.addEventListener('DOMContentLoaded', function() {
     // Check if running in Electron
     const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
@@ -318,91 +321,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }).catch(err => {
                 showNotification('Failed to copy. Please try again.');
                 console.error('Failed to copy text: ', err);
-            });
-        }
-    }
-
-    // Rest of the functions remain the same
-    function showNotification(message) {
-        const notification = document.createElement('div');
-        notification.className = 'notification';
-        notification.textContent = message;
-        notification.style.position = 'fixed';
-        notification.style.bottom = '10px';
-        notification.style.left = '50%';
-        notification.style.transform = 'translateX(-50%)';
-        notification.style.backgroundColor = '#4a86e8';
-        notification.style.color = 'white';
-        notification.style.padding = '8px 16px';
-        notification.style.borderRadius = '4px';
-        notification.style.zIndex = '2000';
-        notification.style.opacity = '0';
-        notification.style.transition = 'opacity 0.3s ease-in-out';
-        
-        document.body.appendChild(notification);
-        
-        // Fade in
-        setTimeout(() => {
-            notification.style.opacity = '1';
-        }, 10);
-        
-        // Remove after delay
-        setTimeout(() => {
-            notification.style.opacity = '0';
-            setTimeout(() => {
-                document.body.removeChild(notification);
-            }, 300);
-        }, 2000);
-    }
-
-    function saveClipboardItems() {
-        if (isElectron && ipcRenderer) {
-            // No-op: handled by DB
-            return;
-        }
-        const items = [];
-        document.querySelectorAll('.clipboard-item').forEach(item => {
-            const img = item.querySelector('img');
-            if (img) {
-                items.push({ type: 'image', content: img.src });
-            } else {
-                const link = item.querySelector('.clip-link');
-                if (link) {
-                    items.push({ type: 'link', content: link.getAttribute('data-url') });
-                } else {
-                    items.push({ type: 'text', content: item.querySelector('p').textContent });
-                }
-            }
-        });
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    }
-    function loadClipboardItems() {
-        try {
-            const items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            items.forEach(item => createClipboardItem(item));
-        } catch (error) {
-            console.error('Error loading clipboard items:', error);
-            localStorage.removeItem(STORAGE_KEY);
-        }
-    }
-
-    function loadClipboardItemsFromDB() {
-        if (isElectron && ipcRenderer) {
-            ipcRenderer.invoke('get-clipboard-items').then(res => {
-                if (res.success) {
-                    res.items.forEach(item => {
-                        if (item.type === 'image' && item.image_data) {
-                            // Use the image_data as a data URL
-                            createClipboardItem({ id: item.id, type: 'image', content: `data:image/png;base64,${item.image_data}` });
-                        } else if (item.type === 'link') {
-                            createClipboardItem({ id: item.id, type: 'link', content: item.content });
-                        } else if (item.type === 'text') {
-                            createClipboardItem({ id: item.id, type: 'text', content: item.content });
-                        }
-                    });
-                } else {
-                    showNotification('DB error: ' + res.error);
-                }
             });
         }
     }
