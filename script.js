@@ -27,7 +27,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/i;
 
     // Initialize with stored clipboard items
-    loadClipboardItems();
+    if (isElectron && ipcRenderer) {
+        loadClipboardItemsFromDB();
+    } else {
+        loadClipboardItems();
+    }
 
     // Drag functionality - only used in browser mode
     // In Electron, we use the -webkit-app-region CSS property
@@ -105,6 +109,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Handle image paste
+    newClipTextarea.addEventListener('paste', function(e) {
+        if (e.clipboardData && e.clipboardData.items) {
+            for (let i = 0; i < e.clipboardData.items.length; i++) {
+                const item = e.clipboardData.items[i];
+                if (item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const imageDataUrl = event.target.result;
+                        if (isElectron && ipcRenderer) {
+                            // Extract base64 part for DB
+                            const base64 = imageDataUrl.split(',')[1];
+                            ipcRenderer.invoke('save-clipboard-item', { type: 'image', content: imageDataUrl, imageData: base64 }).then(res => {
+                                if (res.success) {
+                                    createClipboardItem({ type: 'image', content: imageDataUrl });
+                                    showNotification('Image saved to database!');
+                                } else {
+                                    showNotification('DB error: ' + res.error);
+                                }
+                            });
+                        } else {
+                            createClipboardItem({ type: 'image', content: imageDataUrl });
+                            saveClipboardItems();
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        }
+    });
+
     // Browser-only functions
     function minimizeOverlay() {
         clipboardOverlay.classList.add('minimized');
@@ -123,62 +161,107 @@ document.addEventListener('DOMContentLoaded', function() {
     function addClipboardItem() {
         const clipText = newClipTextarea.value.trim();
         if (clipText) {
-            createClipboardItem(clipText);
-            saveClipboardItems();
-            newClipTextarea.value = '';
+            if (isElectron && ipcRenderer) {
+                // Save to DB via IPC
+                ipcRenderer.invoke('save-clipboard-item', { type: urlRegex.test(clipText) ? 'link' : 'text', content: clipText }).then(res => {
+                    if (res.success) {
+                        createClipboardItem(clipText);
+                        newClipTextarea.value = '';
+                        showNotification('Saved to database!');
+                    } else {
+                        showNotification('DB error: ' + res.error);
+                    }
+                });
+            } else {
+                createClipboardItem(clipText);
+                saveClipboardItems();
+                newClipTextarea.value = '';
+            }
         }
     }
 
-    function createClipboardItem(text) {
-        // Create clipboard item container
+    function createClipboardItem(data) {
+        const MAX_LENGTH = 100;
         const item = document.createElement('div');
-        item.className = 'clipboard-item';
-        
-        // Create clipboard content
-        const content = document.createElement('p');
-        
-        // Check if the text is a URL
-        const isURL = urlRegex.test(text.trim());
-        
-        if (isURL) {
-            // Create a clickable link for URLs
-            content.innerHTML = `<a href="#" class="clip-link" data-url="${text}">
-                <span class="material-icons-outlined" style="font-size: 14px; vertical-align: middle; margin-right: 4px;">link</span>
-                ${text}
-            </a>`;
-            item.classList.add('link-item');
-            
-            // Add event listener to open the URL
-            content.querySelector('a').addEventListener('click', function(e) {
-                e.preventDefault();
-                openURL(this.getAttribute('data-url'));
-            });
-        } else {
-            // Regular text content
-            content.textContent = text;
+        item.className = 'clipboard-item' + (data.type === 'link' ? ' link-item' : '');
+        if (data.id) item.dataset.id = data.id;
+
+        // Create content wrapper
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'clipboard-item-content';
+        let content = document.createElement('p');
+        let isURL = false;
+        let isImage = false;
+        let text = data;
+        if (typeof data === 'object' && data.type === 'image') {
+            isImage = true;
+        } else if (typeof data === 'object' && data.type === 'link') {
+            isURL = true;
+            text = data.content;
+        } else if (typeof data === 'object' && data.type === 'text') {
+            text = data.content;
+        } else if (typeof data === 'string') {
+            isURL = urlRegex.test(data.trim());
         }
-        
+        let expanded = false;
         // Create action buttons
         const actionButtons = document.createElement('div');
         actionButtons.className = 'action-buttons';
-        
         const copyBtn = document.createElement('button');
         copyBtn.title = "Copy to clipboard";
         copyBtn.innerHTML = '📋';
-        copyBtn.addEventListener('click', () => copyToClipboard(text));
-        
+        if (isImage) {
+            copyBtn.addEventListener('click', () => {
+                if (navigator.clipboard && window.ClipboardItem) {
+                    fetch(data.content)
+                        .then(res => res.blob())
+                        .then(blob => {
+                            const item = new ClipboardItem({ [blob.type]: blob });
+                            navigator.clipboard.write([item]);
+                            showNotification('Image copied to clipboard!');
+                        });
+                } else {
+                    showNotification('Image copy not supported in this browser.');
+                }
+            });
+        } else {
+            copyBtn.addEventListener('click', () => copyToClipboard(text));
+        }
         const deleteBtn = document.createElement('button');
         deleteBtn.title = "Delete";
         deleteBtn.innerHTML = '🗑️';
-        deleteBtn.addEventListener('click', () => {
-            item.remove();
-            saveClipboardItems();
+        deleteBtn.addEventListener('click', async () => {
+            if (isElectron && ipcRenderer && item.dataset.id) {
+                const res = await ipcRenderer.invoke('delete-clipboard-item', item.dataset.id);
+                if (res.success) {
+                    item.remove();
+                } else {
+                    showNotification('Failed to delete from DB: ' + res.error);
+                }
+            } else {
+                item.remove();
+                saveClipboardItems();
+            }
         });
-        
-        // Append elements
+        // Expand/contract button for long text
+        let expandBtn = null;
+        if (!isImage && !isURL && typeof text === 'string' && text.length > MAX_LENGTH) {
+            expandBtn = document.createElement('button');
+            expandBtn.title = "Expand/Contract";
+            expandBtn.innerHTML = '<span style="font-size:14px;">➕</span>';
+            expandBtn.className = 'expand-contract-btn';
+            expandBtn.addEventListener('click', function() {
+                expanded = !expanded;
+                if (expanded) {
+                    content.textContent = text;
+                    expandBtn.innerHTML = '<span style="font-size:14px;">➖</span>';
+                } else {
+                    content.textContent = text.slice(0, MAX_LENGTH) + '...';
+                    expandBtn.innerHTML = '<span style="font-size:14px;">➕</span>';
+                }
+            });
+        }
         actionButtons.appendChild(copyBtn);
-        
-        // Add open link button for URLs
         if (isURL) {
             const openBtn = document.createElement('button');
             openBtn.title = "Open link";
@@ -186,13 +269,31 @@ document.addEventListener('DOMContentLoaded', function() {
             openBtn.addEventListener('click', () => openURL(text));
             actionButtons.appendChild(openBtn);
         }
-        
+        if (expandBtn) actionButtons.appendChild(expandBtn);
         actionButtons.appendChild(deleteBtn);
-        
-        item.appendChild(content);
+        if (isImage) {
+            const img = document.createElement('img');
+            img.src = data.content;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.alt = 'Clipboard Image';
+            content.innerHTML = '';
+            content.appendChild(img);
+        } else if (isURL) {
+            content.innerHTML = `<a href="#" class="clip-link" data-url="${text}">${text}</a>`;
+            item.classList.add('link-item');
+            content.querySelector('a').addEventListener('click', function(e) {
+                e.preventDefault();
+                openURL(this.getAttribute('data-url'));
+            });
+        } else if (typeof text === 'string' && text.length > MAX_LENGTH) {
+            content.textContent = text.slice(0, MAX_LENGTH) + '...';
+        } else {
+            content.textContent = text;
+        }
+        contentWrapper.appendChild(content);
+        item.appendChild(contentWrapper);
         item.appendChild(actionButtons);
-        
-        // Add item to the list (prepend to show newest items at the top)
         clipboardItems.insertBefore(item, clipboardItems.firstChild);
     }
 
@@ -255,19 +356,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function saveClipboardItems() {
+        if (isElectron && ipcRenderer) {
+            // No-op: handled by DB
+            return;
+        }
         const items = [];
-        document.querySelectorAll('.clipboard-item p').forEach(item => {
-            const link = item.querySelector('.clip-link');
-            if (link) {
-                items.push(link.getAttribute('data-url'));
+        document.querySelectorAll('.clipboard-item').forEach(item => {
+            const img = item.querySelector('img');
+            if (img) {
+                items.push({ type: 'image', content: img.src });
             } else {
-                items.push(item.textContent);
+                const link = item.querySelector('.clip-link');
+                if (link) {
+                    items.push({ type: 'link', content: link.getAttribute('data-url') });
+                } else {
+                    items.push({ type: 'text', content: item.querySelector('p').textContent });
+                }
             }
         });
-        
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     }
-
     function loadClipboardItems() {
         try {
             const items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -275,6 +383,27 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Error loading clipboard items:', error);
             localStorage.removeItem(STORAGE_KEY);
+        }
+    }
+
+    function loadClipboardItemsFromDB() {
+        if (isElectron && ipcRenderer) {
+            ipcRenderer.invoke('get-clipboard-items').then(res => {
+                if (res.success) {
+                    res.items.forEach(item => {
+                        if (item.type === 'image' && item.image_data) {
+                            // Use the image_data as a data URL
+                            createClipboardItem({ id: item.id, type: 'image', content: `data:image/png;base64,${item.image_data}` });
+                        } else if (item.type === 'link') {
+                            createClipboardItem({ id: item.id, type: 'link', content: item.content });
+                        } else if (item.type === 'text') {
+                            createClipboardItem({ id: item.id, type: 'text', content: item.content });
+                        }
+                    });
+                } else {
+                    showNotification('DB error: ' + res.error);
+                }
+            });
         }
     }
 });

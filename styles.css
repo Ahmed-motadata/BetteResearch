@@ -85,41 +85,88 @@ html, body {
     gap: 10px;
     max-height: 300px;
     overflow-y: auto;
+    padding-right: 4px;
 }
 
 .clipboard-item {
     background-color: #f5f5f5;
     border-radius: 5px;
-    padding: 10px;
+    padding: 10px 10px 10px 10px; /* Remove extra right padding */
     position: relative;
     border-left: 3px solid #4a86e8;
-}
-
-.clipboard-item p {
-    margin-right: 30px;
-    word-break: break-word;
-    font-size: 14px;
+    margin-bottom: 2px;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    width: 100%;
+    min-width: 0;
+    min-height: unset;
+    overflow: unset;
 }
 
 .clipboard-item .action-buttons {
-    position: absolute;
-    right: 5px;
-    top: 5px;
+    position: static;
     display: flex;
-    gap: 5px;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+    margin-left: 8px;
+    margin-top: 0;
+    min-width: 24px;
+    padding: 0;
+}
+
+.clipboard-item-content {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+
+.clipboard-item p {
+    margin: 0;
+    word-break: break-word;
+    font-size: 14px;
+    margin-top: 0px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    background: none;
+    color: #222;
+    padding: 0;
+    width: 100%;
+    white-space: pre-wrap;
+}
+
+.clipboard-item img {
+    display: block;
+    margin-top: 6px;
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    object-fit: contain;
 }
 
 .clipboard-item button {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 14px;
     color: #555;
     padding: 2px;
+    border-radius: 3px;
+    transition: background 0.15s;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .clipboard-item button:hover {
     color: #000;
+    background: #e0e0e0;
 }
 
 .clipboard-input {
@@ -179,21 +226,29 @@ html, body {
 }
 
 /* Link styling */
+.link-item {
+    background-color: #e8f0fe;
+    border-left-color: #1a73e8;
+    border-radius: 5px;
+    box-shadow: 0 1px 4px rgba(26,115,232,0.06);
+    padding: 10px 10px 10px 10px;
+    position: relative;
+}
+
 .clip-link {
     color: #1a73e8;
     text-decoration: none;
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-weight: 500;
+    font-size: 14px;
+    word-break: break-all;
+    padding: 2px 0;
 }
 
 .clip-link:hover {
     text-decoration: underline;
-}
-
-.link-item {
-    background-color: #e8f0fe;
-    border-left-color: #1a73e8;
 }
 
 /* Custom scrollbar */

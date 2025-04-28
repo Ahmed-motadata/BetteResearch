@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, clipboard, shell, nativeImage, 
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
+require('dotenv').config();
 
 // Disable hardware acceleration
 app.disableHardwareAcceleration();
@@ -78,7 +79,7 @@ function createTray() {
   // Create a context menu for the tray
   const contextMenu = Menu.buildFromTemplate([
     { 
-      label: 'Show BetteResearch', 
+      label: 'Show Clipboard Widget', 
       click: () => {
         if (mainWindow === null) {
           createWindow();
@@ -88,7 +89,7 @@ function createTray() {
       }
     },
     { 
-      label: 'Hide BetteResearch', 
+      label: 'Hide Clipboard Widget', 
       click: () => {
         if (mainWindow !== null) {
           mainWindow.hide();
@@ -105,7 +106,7 @@ function createTray() {
     }
   ]);
   
-  tray.setToolTip('BetteResearch');
+  tray.setToolTip('Clipboard Widget');
   tray.setContextMenu(contextMenu);
   
   // Show window when tray icon is clicked
@@ -120,6 +121,57 @@ function createTray() {
   });
 }
 
+// --- PostgreSQL integration ---
+const { Client } = require('pg');
+const dbClient = new Client({
+  user: process.env.PGUSER,
+  host: process.env.PGHOST,
+  database: process.env.PGDATABASE,
+  password: process.env.PGPASSWORD,
+  port: process.env.PGPORT ? parseInt(process.env.PGPORT) : 5432,
+});
+dbClient.connect().catch(err => console.error('Postgres connection error:', err));
+
+// Save clipboard item (text, link, or image)
+ipcMain.handle('save-clipboard-item', async (event, { type, content, imageData }) => {
+  try {
+    const result = await dbClient.query(
+      'INSERT INTO clipboard_items (type, content, image_data) VALUES ($1, $2, $3) RETURNING *',
+      [type, content || null, imageData ? Buffer.from(imageData, 'base64') : null]
+    );
+    return { success: true, item: result.rows[0] };
+  } catch (err) {
+    console.error('DB save error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Fetch all clipboard items
+ipcMain.handle('get-clipboard-items', async () => {
+  try {
+    const result = await dbClient.query('SELECT * FROM clipboard_items ORDER BY created_at DESC');
+    // Convert image_data to base64 for renderer
+    const items = result.rows.map(row => ({
+      ...row,
+      image_data: row.image_data ? row.image_data.toString('base64') : null
+    }));
+    return { success: true, items };
+  } catch (err) {
+    console.error('DB fetch error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('delete-clipboard-item', async (event, id) => {
+  try {
+    await dbClient.query('DELETE FROM clipboard_items WHERE id = $1', [id]);
+    return { success: true };
+  } catch (err) {
+    console.error('DB delete error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 // Create the window when the app is ready
 app.whenReady().then(() => {
   // Set the app icon for Linux/Windows
@@ -133,7 +185,8 @@ app.whenReady().then(() => {
   }
   createWindow();
   createTray();
-  
+
+  // Register global shortcut for toggling window visibility
   globalShortcut.register('Control+Shift+\\', () => {
     if (mainWindow) {
       if (mainWindow.isVisible()) {
@@ -142,6 +195,17 @@ app.whenReady().then(() => {
         mainWindow.show();
       }
     }
+  });
+
+  globalShortcut.register('Control+Shift+=', () => {
+    exec('xclip -o -selection primary', (err, stdout) => {
+      if (!err && stdout.trim()) {
+        if (mainWindow) {
+          mainWindow.webContents.send('add-clipboard-item', stdout.trim());
+          mainWindow.show();
+        }
+      }
+    });
   });
 
   app.on('activate', () => {
