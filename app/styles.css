@@ -26,23 +26,57 @@ html, body {
     z-index: 1000;
     transition: all 0.3s ease;
     overflow: hidden;
+    border: 1px solid #bfc9d1;
 }
 
 .overlay-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
-    padding: 10px 15px;
-    background-color: #4a86e8;
-    color: white;
+    padding: 3px 10px;
+    background: #222e3a;
+    color: #fff;
     cursor: grab;
     user-select: none;
     border-radius: 8px 8px 0 0;
-    -webkit-app-region: drag;  /* Make the header draggable in Electron */
+    -webkit-app-region: drag;
+    min-height: 26px;
+    height: 26px;
+    gap: 8px;
 }
-
 .overlay-header:active {
     cursor: grabbing;
+}
+.overlay-app-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    display: block;
+}
+.overlay-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin: 0 0 0 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.2s;
+    display: inline-block;
+}
+@media (max-width: 340px) {
+    .overlay-title {
+        opacity: 0;
+        width: 0;
+        margin: 0;
+        padding: 0;
+    }
+}
+@media (min-width: 341px) {
+    .overlay-title {
+        opacity: 1;
+        width: auto;
+    }
 }
 
 .overlay-controls {
@@ -71,12 +105,17 @@ html, body {
 
 /* Rest of CSS remains the same */
 .overlay-content {
-    padding: 15px;
+    padding-top: 4px;
     overflow-y: auto;
     flex-grow: 1;
     display: flex;
     flex-direction: column;
     gap: 15px;
+}
+
+.clipboard-items, .clipboard-input {
+    margin-left: 16px;
+    margin-right: 16px;
 }
 
 .clipboard-items {
@@ -176,25 +215,27 @@ html, body {
 }
 
 .clipboard-input textarea {
+    min-height: 56px;
+    font-size: 14px;
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 5px;
     resize: vertical;
-    min-height: 80px;
     font-family: inherit;
 }
 
 .clipboard-input button {
-    padding: 8px;
-    background-color: #4a86e8;
-    color: white;
-    border: none;
+    padding: 6px 0;
+    height: 32px;
+    font-size: 14px;
+    background-color: #222e3a;
+    color: #fff;
     border-radius: 5px;
     cursor: pointer;
 }
 
 .clipboard-input button:hover {
-    background-color: #3a76d8;
+    background-color: #4a86e8;
 }
 
 .restore-button {
@@ -267,4 +308,162 @@ html, body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #a0a0a0;
+}
+
+.collection-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #222e3a;
+    border-bottom: 1px solid #4a86e8;
+    padding: 2px 8px;
+    font-size: 13px;
+    font-weight: 500;
+    min-height: 28px;
+    gap: 18px;
+    height: 32px;
+    border-radius: 12px;
+    margin-top: 0;
+    margin-bottom: 8px;
+    margin-left: 16px;
+    margin-right: 16px;
+}
+.collection-nav {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #4a86e8;
+    padding: 0 12px;
+    border-radius: 50%;
+    transition: transform 0.15s, background 0.15s;
+    height: 32px;
+    width: 32px;
+    min-width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.collection-nav:hover {
+    background: none;
+    transform: scale(1.25);
+    color: #fff;
+}
+.collection-name {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.2px;
+    user-select: text;
+    margin: 0 2px;
+    min-width: 80px;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.collection-new {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #43a047;
+    cursor: pointer;
+    border-radius: 50%;
+    padding: 0 10px;
+    transition: background 0.15s, color 0.15s;
+    height: 28px;
+    width: 28px;
+    min-width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.collection-new:hover {
+    background: #e8f5e9;
+    color: #2e7031;
+}
+.collection-delete {
+    background: none;
+    border: none;
+    font-size: 15px;
+    color: #d32f2f;
+    cursor: pointer;
+    border-radius: 50%;
+    padding: 0 10px;
+    transition: background 0.15s, color 0.15s;
+    height: 28px;
+    width: 28px;
+    min-width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.collection-delete:hover {
+    background: #ffebee;
+    color: #b71c1c;
+}
+.collection-modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.25);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s;
+}
+.collection-modal.hidden {
+    display: none;
+}
+.collection-modal-content {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+    padding: 24px 22px 18px 22px;
+    min-width: 260px;
+    max-width: 90vw;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+}
+.collection-modal-content h4 {
+    margin-bottom: 6px;
+    font-size: 17px;
+    font-weight: 600;
+    color: #222e3a;
+    text-align: center;
+}
+#collection-modal-input {
+    padding: 8px 10px;
+    border: 1px solid #bfc9d1;
+    border-radius: 5px;
+    font-size: 15px;
+    outline: none;
+    margin-bottom: 2px;
+}
+#collection-modal-input:focus {
+    border-color: #4a86e8;
+}
+.collection-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+}
+.collection-modal-actions button {
+    padding: 6px 16px;
+    border-radius: 5px;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    background: #e3eaf6;
+    color: #222e3a;
+    transition: background 0.15s, color 0.15s;
+}
+.collection-modal-actions button:hover {
+    background: #4a86e8;
+    color: #fff;
 }

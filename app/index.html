@@ -9,13 +9,22 @@
 <body>
     <div class="clipboard-overlay" id="clipboard-overlay">
         <div class="overlay-header">
-            <h3>BetteResearch</h3>
+            <img src="../src/icon.png" class="overlay-app-icon" alt="App Icon" />
+            <h3 class="overlay-title">BetteResearch</h3>
+            <div style="flex:1"></div>
             <div class="overlay-controls">
                 <button id="minimize-btn">_</button>
                 <button id="close-btn">×</button>
             </div>
         </div>
         <div class="overlay-content">
+            <div class="collection-header" id="collection-header">
+                <button id="collection-delete" class="collection-delete" title="Delete Collection">❌</button>
+                <button id="collection-left" class="collection-nav" title="Previous Collection">&#8592;</button>
+                <span id="collection-name" class="collection-name">Collection</span>
+                <button id="collection-right" class="collection-nav" title="Next Collection">&#8594;</button>
+                <button id="collection-new" class="collection-new" title="New Collection">＋</button>
+            </div>
             <div class="clipboard-items" id="clipboard-items">
                 <!-- Clipboard items will be added here -->
             </div>

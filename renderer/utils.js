@@ -7,13 +7,14 @@ export function showNotification(message) {
     notification.style.bottom = '10px';
     notification.style.left = '50%';
     notification.style.transform = 'translateX(-50%)';
-    notification.style.backgroundColor = '#4a86e8';
-    notification.style.color = 'white';
-    notification.style.padding = '8px 16px';
-    notification.style.borderRadius = '4px';
-    notification.style.zIndex = '2000';
+    notification.style.backgroundColor = 'rgba(60, 60, 60, 0.75)';
+    notification.style.color = '#f5f5f5';
+    notification.style.padding = '3px 12px';
+    notification.style.fontSize = '12px';
+    notification.style.borderRadius = '6px';
+    notification.style.boxShadow = 'none';
     notification.style.opacity = '0';
-    notification.style.transition = 'opacity 0.3s ease-in-out';
+    notification.style.transition = 'opacity 0.25s';
     document.body.appendChild(notification);
     setTimeout(() => { notification.style.opacity = '1'; }, 10);
     setTimeout(() => {

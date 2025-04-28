@@ -6,3 +6,4 @@ CREATE TABLE IF NOT EXISTS clipboard_items (
     image_data BYTEA,   -- image binary data
     created_at TIMESTAMP DEFAULT NOW()
 );
+ALTER TABLE clipboard_items ADD COLUMN collection_name TEXT;

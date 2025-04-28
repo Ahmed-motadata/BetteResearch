@@ -160,7 +160,7 @@ export function saveClipboardItems() {
     localStorage.setItem('clipboardCollectionItems', JSON.stringify(items));
 }
 
-export function loadClipboardItemsFromDB() {
+export function loadClipboardItemsFromDB(collectionName) {
     const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
     let ipcRenderer;
     if (isElectron) {
@@ -168,17 +168,31 @@ export function loadClipboardItemsFromDB() {
             ipcRenderer = window.require('electron').ipcRenderer;
         } catch {}
     }
-    if (isElectron && ipcRenderer) {
-        ipcRenderer.invoke('get-clipboard-items').then(res => {
+    // Clear current items
+    const clipboardItems = document.getElementById('clipboard-items');
+    if (clipboardItems) clipboardItems.innerHTML = '';
+    if (isElectron && ipcRenderer && collectionName) {
+        ipcRenderer.invoke('get-clipboard-items', collectionName).then(res => {
             if (res.success) {
-                // Insert each item at the bottom to preserve LIFO order (largest id first)
                 res.items.sort((a, b) => b.id - a.id).forEach(item => {
-                    if (item.type === 'image' && item.image_data) {
-                        createClipboardItem({ id: item.id, type: 'image', content: `data:image/png;base64,${item.image_data}` }, false);
+                    if (item.type === 'image') {
+                        createClipboardItem({ 
+                            id: item.id, 
+                            type: 'image', 
+                            content: item.content 
+                        }, false);
                     } else if (item.type === 'link') {
-                        createClipboardItem({ id: item.id, type: 'link', content: item.content }, false);
+                        createClipboardItem({ 
+                            id: item.id, 
+                            type: 'link', 
+                            content: item.content 
+                        }, false);
                     } else if (item.type === 'text') {
-                        createClipboardItem({ id: item.id, type: 'text', content: item.content }, false);
+                        createClipboardItem({ 
+                            id: item.id, 
+                            type: 'text', 
+                            content: item.content 
+                        }, false);
                     }
                 });
             } else {

@@ -1,5 +1,5 @@
-import { createClipboardItem, loadClipboardItems, loadClipboardItemsFromDB, saveClipboardItems } from './clipboard.js';
-import { showNotification } from '../renderer/utils.js';
+import { createClipboardItem, loadClipboardItems, saveClipboardItems } from './renderer/clipboard.js';
+import { showNotification } from './renderer/utils.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     // Check if running in Electron
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize with stored clipboard items
     if (isElectron && ipcRenderer) {
-        // loadClipboardItemsFromDB(); // REMOVE this line, let loadCollections handle initial load
+        loadClipboardItemsFromDB();
     } else {
         loadClipboardItems();
     }
@@ -114,11 +114,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle image paste
     newClipTextarea.addEventListener('paste', function(e) {
-        console.log('Paste event detected');
         if (e.clipboardData && e.clipboardData.items) {
             for (let i = 0; i < e.clipboardData.items.length; i++) {
                 const item = e.clipboardData.items[i];
-                console.log('Clipboard item type:', item.type);
                 if (item.type.indexOf('image') !== -1) {
                     const file = item.getAsFile();
                     const reader = new FileReader();
@@ -127,220 +125,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (isElectron && ipcRenderer) {
                             // Extract base64 part for DB
                             const base64 = imageDataUrl.split(',')[1];
-                            // Make sure to pass the current collection name
-                            ipcRenderer.invoke('save-clipboard-item', { 
-                                type: 'image', 
-                                content: imageDataUrl, 
-                                imageData: base64,
-                                collectionName: currentCollection ? currentCollection.name : 'default_collection'
-                            }).then(res => {
+                            ipcRenderer.invoke('save-clipboard-item', { type: 'image', content: imageDataUrl, imageData: base64 }).then(res => {
                                 if (res.success) {
-                                    createClipboardItem({ id: res.item.id, type: 'image', content: imageDataUrl });
-                                    showNotification('Image saved to clipboard!');
+                                    // Instead of displaying the local image, reload from DB to ensure persistence
+                                    loadClipboardItemsFromDB();
+                                    showNotification('Image saved to database!');
                                 } else {
-                                    console.error('Failed to save image:', res.error);
                                     showNotification('DB error: ' + res.error);
                                 }
-                            }).catch(err => {
-                                console.error('Error saving image:', err);
-                                showNotification('Error saving image: ' + (err.message || 'Unknown error'));
                             });
                         } else {
                             createClipboardItem({ type: 'image', content: imageDataUrl });
                             saveClipboardItems();
-                            showNotification('Image copied to clipboard!');
                         }
-                    };
-                    reader.onerror = function(error) {
-                        console.error('FileReader error:', error);
-                        showNotification('Error reading image from clipboard');
                     };
                     reader.readAsDataURL(file);
                     e.preventDefault();
                     break;
                 }
             }
-        } else {
-            console.log('No clipboard data or items available');
         }
     });
-
-    // --- Collection Navigation Logic ---
-    let collections = [];
-    let currentCollectionIndex = 0;
-    let currentCollection = null;
-
-    function updateCollectionHeader() {
-        const nameSpan = document.getElementById('collection-name');
-        nameSpan.textContent = currentCollection ? currentCollection.name : '';
-    }
-
-    async function loadCollections() {
-        const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
-        let ipcRenderer;
-        if (isElectron) {
-            try {
-                ipcRenderer = window.require('electron').ipcRenderer;
-            } catch {}
-        }
-        if (isElectron && ipcRenderer) {
-            const res = await ipcRenderer.invoke('get-collections');
-            if (res.success && res.collections.length > 0) {
-                collections = res.collections;
-                // Restore last used collection from localStorage, else use first
-                const last = localStorage.getItem('currentCollection');
-                currentCollectionIndex = Math.max(0, collections.findIndex(c => c.name === last));
-                if (currentCollectionIndex === -1) currentCollectionIndex = 0;
-                currentCollection = collections[currentCollectionIndex];
-                updateCollectionHeader();
-                loadClipboardItemsFromDB(currentCollection.name);
-            } else if (res.success && res.collections.length === 0) {
-                collections = [];
-                currentCollection = null;
-                updateCollectionHeader();
-                loadClipboardItemsFromDB(null); // Show empty
-            }
-        }
-    }
-
-    document.getElementById('collection-left').onclick = () => {
-        if (!collections.length || currentCollectionIndex === 0) return;
-        currentCollectionIndex--;
-        currentCollection = collections[currentCollectionIndex];
-        localStorage.setItem('currentCollection', currentCollection.name);
-        updateCollectionHeader();
-        loadClipboardItemsFromDB(currentCollection.name);
-    };
-    document.getElementById('collection-right').onclick = () => {
-        if (!collections.length || currentCollectionIndex === collections.length - 1) return;
-        currentCollectionIndex++;
-        currentCollection = collections[currentCollectionIndex];
-        localStorage.setItem('currentCollection', currentCollection.name);
-        updateCollectionHeader();
-        loadClipboardItemsFromDB(currentCollection.name);
-    };
-
-    // --- Collection Creation Modal ---
-    const collectionModal = document.createElement('div');
-    collectionModal.id = 'collection-modal';
-    collectionModal.className = 'collection-modal hidden';
-    collectionModal.innerHTML = `
-        <div class="collection-modal-content">
-            <h4>Create New Collection</h4>
-            <input id="collection-modal-input" type="text" placeholder="Collection name" maxlength="64" autofocus />
-            <div class="collection-modal-actions">
-                <button id="collection-modal-cancel">Cancel</button>
-                <button id="collection-modal-create">Create</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(collectionModal);
-
-    function showCollectionModal() {
-        collectionModal.classList.remove('hidden');
-        document.getElementById('collection-modal-input').value = '';
-        document.getElementById('collection-modal-input').focus();
-    }
-    function hideCollectionModal() {
-        collectionModal.classList.add('hidden');
-    }
-
-    document.getElementById('collection-new').onclick = () => {
-        showCollectionModal();
-    };
-    document.getElementById('collection-modal-cancel').onclick = hideCollectionModal;
-    document.getElementById('collection-modal-create').onclick = async () => {
-        const name = document.getElementById('collection-modal-input').value.trim();
-        if (!name) return;
-        const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
-        let ipcRenderer;
-        if (isElectron) {
-            try {
-                ipcRenderer = window.require('electron').ipcRenderer;
-            } catch (error) {
-                console.warn('Unable to require electron modules:', error);
-            }
-        }
-        if (isElectron && ipcRenderer) {
-            const res = await ipcRenderer.invoke('create-collection', name);
-            if (res.success) {
-                await loadCollections();
-                showNotification('Collection created!');
-                hideCollectionModal();
-                loadClipboardItemsFromDB(name); // Show empty for new collection
-            } else {
-                showNotification('Error: ' + res.error);
-            }
-        }
-    };
-    document.getElementById('collection-modal-input').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            document.getElementById('collection-modal-create').click();
-        } else if (e.key === 'Escape') {
-            hideCollectionModal();
-        }
-    });
-
-    // --- Collection Delete Modal ---
-    const deleteModal = document.createElement('div');
-    deleteModal.id = 'collection-delete-modal';
-    deleteModal.className = 'collection-modal hidden';
-    deleteModal.innerHTML = `
-        <div class="collection-modal-content">
-            <h4>Delete Collection</h4>
-            <div id="collection-delete-modal-msg" style="margin-bottom:10px;font-size:14px;color:#444;text-align:center;"></div>
-            <div class="collection-modal-actions">
-                <button id="collection-delete-cancel">Cancel</button>
-                <button id="collection-delete-confirm" style="background:#d32f2f;color:#fff;">Delete</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(deleteModal);
-
-    function showDeleteModal(collectionName) {
-        document.getElementById('collection-delete-modal-msg').textContent = `Are you sure you want to delete "${collectionName}"? This cannot be undone.`;
-        deleteModal.classList.remove('hidden');
-    }
-    function hideDeleteModal() {
-        deleteModal.classList.add('hidden');
-    }
-
-    document.getElementById('collection-delete').onclick = () => {
-        if (!currentCollection) return;
-        showDeleteModal(currentCollection.name);
-    };
-    document.getElementById('collection-delete-cancel').onclick = hideDeleteModal;
-    document.getElementById('collection-delete-confirm').onclick = async () => {
-        if (!currentCollection) return;
-        const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
-        let ipcRenderer;
-        if (isElectron) {
-            try {
-                ipcRenderer = window.require('electron').ipcRenderer;
-            } catch (error) {
-                console.warn('Unable to require electron modules:', error);
-            }
-        }
-        if (isElectron && ipcRenderer) {
-            const res = await ipcRenderer.invoke('delete-collection', currentCollection.name);
-            if (res.success) {
-                await loadCollections();
-                showNotification('Collection deleted!');
-                hideDeleteModal();
-            } else {
-                showNotification('Error: ' + res.error);
-            }
-        }
-    };
-    // Allow Esc to close delete modal
-    deleteModal.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') hideDeleteModal();
-    });
-
-    // Call loadCollections on startup
-    if (isElectron && ipcRenderer) {
-        loadCollections();
-    }
 
     // Browser-only functions
     function minimizeOverlay() {
@@ -361,10 +166,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const clipText = newClipTextarea.value.trim();
         if (clipText) {
             if (isElectron && ipcRenderer) {
-                // Save to DB via IPC, include collectionName
-                ipcRenderer.invoke('save-clipboard-item', { type: urlRegex.test(clipText) ? 'link' : 'text', content: clipText, collectionName: currentCollection ? currentCollection.name : null }).then(res => {
+                // Save to DB via IPC
+                ipcRenderer.invoke('save-clipboard-item', { type: urlRegex.test(clipText) ? 'link' : 'text', content: clipText }).then(res => {
                     if (res.success) {
-                        createClipboardItem(clipText);
+                        // Reload all items from DB to ensure consistency
+                        loadClipboardItemsFromDB();
                         newClipTextarea.value = '';
                         showNotification('Saved to database!');
                     } else {
