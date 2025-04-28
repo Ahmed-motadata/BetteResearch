@@ -134,15 +134,14 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   
-  globalShortcut.register('Control+Shift+=', () => {
-    exec('xclip -o -selection primary', (err, stdout) => {
-      if (!err && stdout.trim()) {
-        if (mainWindow) {
-          mainWindow.webContents.send('add-clipboard-item', stdout.trim());
-          mainWindow.show();
-        }
+  globalShortcut.register('Control+Shift+\\', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
       }
-    });
+    }
   });
 
   app.on('activate', () => {
