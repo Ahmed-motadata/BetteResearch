@@ -1,7 +1,8 @@
 {
   "name": "betteresearch",
+  "productName": "BetteResearch",
   "version": "1.0.0",
-  "description": "A web-based clipboard collection tool that stays on top of your screen. This overlay allows you to save multiple text snippets and easily copy them when needed.",
+  "description": "BetteResearch clipboard collection app",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

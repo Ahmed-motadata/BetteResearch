@@ -1,6 +1,10 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, clipboard, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, clipboard, shell, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { exec } = require('child_process');
+
+// Disable hardware acceleration
+app.disableHardwareAcceleration();
 
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
@@ -12,7 +16,7 @@ function createWindow() {
   const { screen } = require('electron');
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width } = primaryDisplay.workAreaSize;
-  
+  const iconPath = path.join(__dirname, 'icon.png');
   mainWindow = new BrowserWindow({
     width: 350,
     height: 450,
@@ -29,7 +33,8 @@ function createWindow() {
     skipTaskbar: false, // Show in taskbar for better discoverability
     alwaysOnTop: true, // Stay on top of other windows
     minWidth: 250,
-    minHeight: 200
+    minHeight: 200,
+    icon: iconPath,
   });
   
   // Load the index.html file
@@ -67,79 +72,79 @@ function saveWindowBounds() {
 
 // Create system tray
 function createTray() {
-  try {
-    // Try to create a basic tray icon using a data URL if the image file doesn't exist
-    let iconPath = path.join(__dirname, 'clipboard-icon.png');
-    
-    // Check if the icon file exists
-    if (!fs.existsSync(iconPath)) {
-      // Create a simple tray icon as fallback
-      const image = nativeImage.createFromDataURL(`
-        data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAA
-        pElEQVR42mNgGAVDCvynApYH4v1A/B+KDwCxAiXmygPxfyj+D8RvgXg+EG8A4v9Q9iYgliPXcAYoZzMSewPUcQ+QxLdA+eBItIOh
-        g4G4AWpJA1TMkFyLNwPxZyB2HIClGlB9/4H4HRArUJKCD0A1a1HK4QEgPgvVfBeIzYDYAYgvQ+W+A/FcauSDE0DsALXsMZT9E4jN
-        qZnZBnSBGgWjYOgDAJXwMBz+3AI8AAAAAElFTkSuQmCC
-      `);
-      tray = new Tray(image);
-    } else {
-      // Use the actual icon file if it exists
-      tray = new Tray(iconPath);
+  const iconPath = path.join(__dirname, 'icon.png');
+  tray = new Tray(nativeImage.createFromPath(iconPath));
+
+  // Create a context menu for the tray
+  const contextMenu = Menu.buildFromTemplate([
+    { 
+      label: 'Show BetteResearch', 
+      click: () => {
+        if (mainWindow === null) {
+          createWindow();
+        } else {
+          mainWindow.show();
+        }
+      }
+    },
+    { 
+      label: 'Hide BetteResearch', 
+      click: () => {
+        if (mainWindow !== null) {
+          mainWindow.hide();
+        }
+      }
+    },
+    { type: 'separator' },
+    { 
+      label: 'Quit', 
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      }
     }
-    
-    // Create a context menu for the tray
-    const contextMenu = Menu.buildFromTemplate([
-      { 
-        label: 'Show Clipboard Widget', 
-        click: () => {
-          if (mainWindow === null) {
-            createWindow();
-          } else {
-            mainWindow.show();
-          }
-        }
-      },
-      { 
-        label: 'Hide Clipboard Widget', 
-        click: () => {
-          if (mainWindow !== null) {
-            mainWindow.hide();
-          }
-        }
-      },
-      { type: 'separator' },
-      { 
-        label: 'Quit', 
-        click: () => {
-          app.isQuitting = true;
-          app.quit();
-        }
-      }
-    ]);
-    
-    tray.setToolTip('Clipboard Widget');
-    tray.setContextMenu(contextMenu);
-    
-    // Show window when tray icon is clicked
-    tray.on('click', () => {
-      if (mainWindow === null) {
-        createWindow();
-      } else if (mainWindow.isVisible()) {
-        mainWindow.hide();
-      } else {
-        mainWindow.show();
-      }
-    });
-  } catch (error) {
-    console.error('Failed to create tray:', error);
-    // Continue without tray in case of error
-  }
+  ]);
+  
+  tray.setToolTip('BetteResearch');
+  tray.setContextMenu(contextMenu);
+  
+  // Show window when tray icon is clicked
+  tray.on('click', () => {
+    if (mainWindow === null) {
+      createWindow();
+    } else if (mainWindow.isVisible()) {
+      mainWindow.hide();
+    } else {
+      mainWindow.show();
+    }
+  });
 }
 
 // Create the window when the app is ready
 app.whenReady().then(() => {
+  // Set the app icon for Linux/Windows
+  const iconPath = path.join(__dirname, 'icon.png');
+  if (process.platform === 'linux' && app.setIcon) {
+    app.setIcon(iconPath);
+  }
+  // Set the app icon for macOS
+  if (process.platform === 'darwin' && app.dock && app.dock.setIcon) {
+    app.dock.setIcon(iconPath);
+  }
   createWindow();
   createTray();
   
+  globalShortcut.register('Control+Shift+=', () => {
+    exec('xclip -o -selection primary', (err, stdout) => {
+      if (!err && stdout.trim()) {
+        if (mainWindow) {
+          mainWindow.webContents.send('add-clipboard-item', stdout.trim());
+          mainWindow.show();
+        }
+      }
+    });
+  });
+
   app.on('activate', () => {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
@@ -154,6 +159,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 // Handle IPC messages from the renderer process
