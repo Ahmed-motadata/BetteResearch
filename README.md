@@ -24,6 +24,8 @@ A desktop clipboard collection tool that stays on top of your screen. This appli
 
 ## Installation
 
+### Method 1: Standard Installation
+
 1. Clone or download this repository
 2. Install dependencies:
    ```
@@ -43,6 +45,36 @@ A desktop clipboard collection tool that stays on top of your screen. This appli
    npm start
    ```
 
+### Method 2: Docker Installation (Cross-Platform)
+
+Using Docker provides a containerized environment with PostgreSQL included, making it easy to run the application across different platforms without complex setup.
+
+#### Prerequisites:
+- [Docker](https://docs.docker.com/get-docker/) installed
+- [Docker Compose](https://docs.docker.com/compose/install/) installed
+
+#### For Linux/macOS Users:
+
+1. Clone or download this repository
+2. Open terminal in the project directory
+3. Run the application:
+   ```
+   ./run.sh
+   ```
+   This script will:
+   - Check for Docker and Docker Compose
+   - Set up X11 permissions for the GUI
+   - Start PostgreSQL container
+   - Start BetteResearch application
+
+#### For Windows Users:
+
+1. Clone or download this repository
+2. Install an X Server like [VcXsrv](https://sourceforge.net/projects/vcxsrv/) or [Xming](https://sourceforge.net/projects/xming/)
+3. Start the X Server with "Disable access control" option enabled
+4. Double-click `run.bat` to start the application
+5. Follow the on-screen instructions
+
 ## Usage
 
 1. When started, the application appears as a small window on the right side of your screen
@@ -60,6 +92,30 @@ A desktop clipboard collection tool that stays on top of your screen. This appli
 - Collections are stored in a `collections` table
 - Each collection has its own table for clipboard items
 - Clipboard items can store text, links, or image data
+
+## Docker Details
+
+The Docker setup includes:
+
+- A PostgreSQL container that persists data in a Docker volume
+- An Electron application container with X11 forwarding for GUI display
+- Environment configuration for cross-platform compatibility
+
+Data is persisted between sessions through Docker volumes. You can manage the Docker containers using standard Docker commands:
+
+```bash
+# View running containers
+docker ps
+
+# Stop the application
+docker-compose down
+
+# Start just the PostgreSQL database
+docker-compose up -d postgres
+
+# View logs
+docker-compose logs -f app
+```
 
 ## License
 
