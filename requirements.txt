@@ -1,0 +1,8 @@
+# Node.js dependencies are managed via package.json
+# This file is for any additional Python dependencies that might be required
+
+# PostgreSQL client libraries
+psycopg2-binary>=2.9.3
+
+# Environment variables management
+python-dotenv>=0.19.0
