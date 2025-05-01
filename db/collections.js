@@ -17,6 +17,17 @@ async function getCollections() {
 async function createCollection(name) {
   const dbClient = await getClient();
   await dbClient.query('INSERT INTO collections (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [name]);
+  // Create a new table for this collection
+  const table = sanitizeTableName(name);
+  await dbClient.query(`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id SERIAL PRIMARY KEY,
+      type TEXT NOT NULL,
+      content TEXT,
+      image_data BYTEA,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
 }
 
 function sanitizeTableName(name) {
@@ -28,11 +39,9 @@ function sanitizeTableName(name) {
 async function deleteCollection(name) {
   const dbClient = await getClient();
   await dbClient.query('DELETE FROM collections WHERE name = $1', [name]);
-  // Drop the associated clipboard table
+  // Always drop the associated clipboard table for this collection
   const table = sanitizeTableName(name);
-  if (table !== 'clipboard_items') {
-    await dbClient.query(`DROP TABLE IF EXISTS ${table}`);
-  }
+  await dbClient.query(`DROP TABLE IF EXISTS ${table}`);
 }
 
 module.exports = {
