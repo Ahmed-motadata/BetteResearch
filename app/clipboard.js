@@ -62,8 +62,15 @@ export function createClipboardItem(data, insertOnTop = true) {
                 ipcRenderer = window.require('electron').ipcRenderer;
             } catch {}
         }
+        // Get the current collection name from a global or window variable
+        let collectionName = null;
+        if (window.currentCollection && window.currentCollection.name) {
+            collectionName = window.currentCollection.name;
+        } else if (window.localStorage) {
+            collectionName = window.localStorage.getItem('currentCollection') || 'default_collection';
+        }
         if (isElectron && ipcRenderer && item.dataset.id) {
-            const res = await ipcRenderer.invoke('delete-clipboard-item', item.dataset.id);
+            const res = await ipcRenderer.invoke('delete-clipboard-item', item.dataset.id, collectionName);
             if (res.success) {
                 item.remove();
             } else {
