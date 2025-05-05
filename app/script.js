@@ -126,6 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.ctrlKey && e.key === 'Enter') {
             addClipboardItem();
         }
+        // Removed Ctrl+Shift+Spacebar shortcut
     });
 
     // Handle image paste
