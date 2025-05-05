@@ -28,6 +28,88 @@ export function createClipboardItem(data, insertOnTop = true) {
         isURL = urlRegex.test(data.trim());
     }
     let expanded = false;
+    // --- Title UI: always editable, single-line ---
+    function makeTitleElem(title) {
+        let elem;
+        if (title && title.length > 0) {
+            elem = document.createElement('div');
+            elem.textContent = title;
+            elem.style.fontWeight = 'bold';
+            elem.style.fontSize = '13px';
+            elem.style.color = '#444';
+            elem.style.marginBottom = '2px';
+            elem.style.overflow = 'hidden';
+            elem.style.textOverflow = 'ellipsis';
+            elem.style.whiteSpace = 'nowrap';
+            elem.style.cursor = 'pointer';
+            elem.title = 'Click to edit title';
+        } else {
+            elem = document.createElement('button');
+            elem.textContent = '+';
+            elem.style.background = 'none';
+            elem.style.border = 'none';
+            elem.style.color = '#888';
+            elem.style.fontSize = '12px';
+            elem.style.cursor = 'pointer';
+            elem.style.margin = '0 2px 0 0'; // Minimal margin
+            elem.style.padding = '0'; // No padding
+            elem.style.display = 'inline';
+            elem.style.lineHeight = '1';
+        }
+        elem.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = title || '';
+            input.placeholder = 'Add title';
+            input.style.fontWeight = 'bold';
+            input.style.fontSize = '13px';
+            input.style.color = '#444';
+            input.style.marginBottom = '2px';
+            input.style.width = '90%';
+            input.style.border = '1px solid #e0e0e0';
+            input.style.borderRadius = '4px';
+            input.style.padding = '2px 6px';
+            input.style.background = '#fafbfc';
+            input.style.outline = 'none';
+            input.addEventListener('keydown', async function(ev) {
+                if (ev.key === 'Enter') input.blur();
+            });
+            input.addEventListener('blur', async function() {
+                const newTitle = input.value.trim();
+                if (newTitle !== (title || '')) {
+                    // Save to backend
+                    const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
+                    let ipcRenderer;
+                    if (isElectron) {
+                        try { ipcRenderer = window.require('electron').ipcRenderer; } catch {}
+                    }
+                    let collectionName = null;
+                    if (window.currentCollection && window.currentCollection.name) {
+                        collectionName = window.currentCollection.name;
+                    } else if (window.localStorage) {
+                        collectionName = window.localStorage.getItem('currentCollection') || 'default_collection';
+                    }
+                    if (isElectron && ipcRenderer && data.id) {
+                        await ipcRenderer.invoke('update-clipboard-item-title', {
+                            id: data.id,
+                            collectionName,
+                            title: newTitle
+                        });
+                    }
+                    data.title = newTitle;
+                }
+                // Replace input with new title/button (always editable)
+                const newElem = makeTitleElem(data.title);
+                contentWrapper.replaceChild(newElem, input);
+            });
+            contentWrapper.replaceChild(input, elem);
+            input.focus();
+        });
+        return elem;
+    }
+    // Always show a title bar: either the title or the '+' button
+    contentWrapper.appendChild(makeTitleElem(data.title));
     // Create action buttons
     const actionButtons = document.createElement('div');
     actionButtons.className = 'action-buttons';
@@ -62,12 +144,12 @@ export function createClipboardItem(data, insertOnTop = true) {
                 ipcRenderer = window.require('electron').ipcRenderer;
             } catch {}
         }
-        // Get the current collection name from a global or window variable
+        // Get and sanitize the current collection name
         let collectionName = null;
         if (window.currentCollection && window.currentCollection.name) {
-            collectionName = window.currentCollection.name;
+            collectionName = window.currentCollection.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
         } else if (window.localStorage) {
-            collectionName = window.localStorage.getItem('currentCollection') || 'default_collection';
+            collectionName = (window.localStorage.getItem('currentCollection') || 'default_collection').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
         }
         if (isElectron && ipcRenderer && item.dataset.id) {
             const res = await ipcRenderer.invoke('delete-clipboard-item', item.dataset.id, collectionName);
@@ -153,14 +235,20 @@ export function saveClipboardItems() {
     const items = [];
     document.querySelectorAll('.clipboard-item').forEach(item => {
         const img = item.querySelector('img');
+        // Get the title from the first child if it's a div (title) or button (add title)
+        let title = '';
+        const titleElem = item.querySelector('.clipboard-item-content').firstChild;
+        if (titleElem && titleElem.nodeName === 'DIV') {
+            title = titleElem.textContent;
+        }
         if (img) {
-            items.push({ type: 'image', content: img.src });
+            items.push({ type: 'image', content: img.src, title });
         } else {
             const link = item.querySelector('.clip-link');
             if (link) {
-                items.push({ type: 'link', content: link.getAttribute('data-url') });
+                items.push({ type: 'link', content: link.getAttribute('data-url'), title });
             } else {
-                items.push({ type: 'text', content: item.querySelector('p').textContent });
+                items.push({ type: 'text', content: item.querySelector('p').textContent, title });
             }
         }
     });
@@ -182,25 +270,12 @@ export function loadClipboardItemsFromDB(collectionName) {
         ipcRenderer.invoke('get-clipboard-items', collectionName).then(res => {
             if (res.success) {
                 res.items.sort((a, b) => b.id - a.id).forEach(item => {
-                    if (item.type === 'image') {
-                        createClipboardItem({ 
-                            id: item.id, 
-                            type: 'image', 
-                            content: item.content 
-                        }, false);
-                    } else if (item.type === 'link') {
-                        createClipboardItem({ 
-                            id: item.id, 
-                            type: 'link', 
-                            content: item.content 
-                        }, false);
-                    } else if (item.type === 'text') {
-                        createClipboardItem({ 
-                            id: item.id, 
-                            type: 'text', 
-                            content: item.content 
-                        }, false);
-                    }
+                    createClipboardItem({
+                        id: item.id,
+                        type: item.type,
+                        content: item.content,
+                        title: item.title
+                    }, false);
                 });
             } else {
                 import('./utils.js').then(({ showNotification }) => showNotification('DB error: ' + res.error));

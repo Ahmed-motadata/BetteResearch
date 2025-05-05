@@ -3,11 +3,11 @@ const clipboardDB = require('../db/clipboard');
 const collectionsDB = require('../db/collections');
 const { ipcMain, clipboard, shell } = require('electron');
 
-ipcMain.handle('save-clipboard-item', async (event, { type, content, imageData, collectionName }) => {
+ipcMain.handle('save-clipboard-item', async (event, { type, content, imageData, collectionName, title }) => {
   try {
     // Fallback to '2ndCollection' if no collectionName is provided
     const effectiveCollection = collectionName || '2ndCollection';
-    const item = await clipboardDB.saveClipboardItem({ type, content, imageData, collectionName: effectiveCollection });
+    const item = await clipboardDB.saveClipboardItem({ type, content, imageData, collectionName: effectiveCollection, title });
     return { success: true, item };
   } catch (err) {
     return { success: false, error: err.message };
@@ -51,6 +51,15 @@ ipcMain.handle('create-collection', async (event, name) => {
 ipcMain.handle('delete-collection', async (event, name) => {
   try {
     await collectionsDB.deleteCollection(name);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('update-clipboard-item-title', async (event, { id, collectionName, title }) => {
+  try {
+    await clipboardDB.updateClipboardItemTitle(id, collectionName, title);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };

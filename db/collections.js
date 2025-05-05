@@ -17,12 +17,13 @@ async function getCollections() {
 async function createCollection(name) {
   const dbClient = await getClient();
   await dbClient.query('INSERT INTO collections (name) VALUES ($1) ON CONFLICT (name) DO NOTHING', [name]);
-  // Create a new table for this collection
+  // Create a new table for this collection, now with a 'title' column
   const table = sanitizeTableName(name);
   await dbClient.query(`
     CREATE TABLE IF NOT EXISTS ${table} (
       id SERIAL PRIMARY KEY,
       type TEXT NOT NULL,
+      title TEXT,
       content TEXT,
       image_data BYTEA,
       created_at TIMESTAMP DEFAULT NOW()

@@ -25,6 +25,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const newClipTextarea = document.getElementById('new-clip');
     const addBtn = document.getElementById('add-btn');
 
+    // Add after getting newClipTextarea
+    const newClipTitle = document.createElement('input');
+    newClipTitle.type = 'text';
+    newClipTitle.placeholder = 'Add title (optional)';
+    newClipTitle.className = 'clip-title-input';
+    newClipTitle.style.display = 'block';
+    newClipTitle.style.width = '100%';
+    newClipTitle.style.marginBottom = '4px';
+    newClipTitle.style.fontSize = '13px';
+    newClipTitle.style.border = '1px solid #e0e0e0';
+    newClipTitle.style.borderRadius = '4px';
+    newClipTitle.style.padding = '3px 8px';
+    newClipTitle.style.background = '#fafbfc';
+    newClipTitle.style.color = '#444';
+    newClipTextarea.parentNode.insertBefore(newClipTitle, newClipTextarea);
+
     // Local storage key
     const STORAGE_KEY = 'clipboardCollectionItems';
     const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/i;
@@ -175,6 +191,31 @@ document.addEventListener('DOMContentLoaded', function() {
         nameSpan.textContent = currentCollection ? currentCollection.name : '';
     }
 
+    function ensureTitleInput() {
+        // Remove any existing title input
+        const oldTitleInput = document.querySelector('.clip-title-input');
+        if (oldTitleInput && oldTitleInput.parentNode) {
+            oldTitleInput.parentNode.removeChild(oldTitleInput);
+        }
+        // Create and insert a new title input above the textarea
+        const newClipTextarea = document.getElementById('new-clip');
+        const newClipTitle = document.createElement('input');
+        newClipTitle.type = 'text';
+        newClipTitle.placeholder = 'Add title (optional)';
+        newClipTitle.className = 'clip-title-input';
+        newClipTitle.style.display = 'block';
+        newClipTitle.style.width = '100%';
+        newClipTitle.style.marginBottom = '4px';
+        newClipTitle.style.fontSize = '13px';
+        newClipTitle.style.border = '1px solid #e0e0e0';
+        newClipTitle.style.borderRadius = '4px';
+        newClipTitle.style.padding = '3px 8px';
+        newClipTitle.style.background = '#fafbfc';
+        newClipTitle.style.color = '#444';
+        newClipTextarea.parentNode.insertBefore(newClipTitle, newClipTextarea);
+        newClipTitle.value = '';
+    }
+
     async function loadCollections() {
         const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
         let ipcRenderer;
@@ -186,18 +227,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isElectron && ipcRenderer) {
             const res = await ipcRenderer.invoke('get-collections');
             if (res.success && res.collections.length > 0) {
-                collections = res.collections;
+                // Filter out 'default' collection
+                collections = res.collections.filter(c => c.name.toLowerCase() !== 'default');
                 // Restore last used collection from localStorage, else use first
                 const last = localStorage.getItem('currentCollection');
                 currentCollectionIndex = Math.max(0, collections.findIndex(c => c.name === last));
                 if (currentCollectionIndex === -1) currentCollectionIndex = 0;
                 currentCollection = collections[currentCollectionIndex];
                 updateCollectionHeader();
+                ensureTitleInput();
                 loadClipboardItemsFromDB(currentCollection.name);
             } else if (res.success && res.collections.length === 0) {
                 collections = [];
                 currentCollection = null;
                 updateCollectionHeader();
+                ensureTitleInput();
                 loadClipboardItemsFromDB(null); // Show empty
             }
         }
@@ -209,6 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentCollection = collections[currentCollectionIndex];
         localStorage.setItem('currentCollection', currentCollection.name);
         updateCollectionHeader();
+        ensureTitleInput();
         loadClipboardItemsFromDB(currentCollection.name);
     };
     document.getElementById('collection-right').onclick = () => {
@@ -217,6 +262,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentCollection = collections[currentCollectionIndex];
         localStorage.setItem('currentCollection', currentCollection.name);
         updateCollectionHeader();
+        ensureTitleInput();
         loadClipboardItemsFromDB(currentCollection.name);
     };
 
@@ -265,6 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const res = await ipcRenderer.invoke('create-collection', name);
             if (res.success) {
                 await loadCollections();
+                ensureTitleInput(); // Ensure title input is present for the new collection
                 showNotification('Collection created!');
                 hideCollectionModal();
                 loadClipboardItemsFromDB(name); // Show empty for new collection
@@ -359,22 +406,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function addClipboardItem() {
         const clipText = newClipTextarea.value.trim();
+        const currentTitleInput = document.querySelector('.clip-title-input');
+        const clipTitle = currentTitleInput ? currentTitleInput.value.trim() : '';
         if (clipText) {
             if (isElectron && ipcRenderer) {
-                // Save to DB via IPC, include collectionName
-                ipcRenderer.invoke('save-clipboard-item', { type: urlRegex.test(clipText) ? 'link' : 'text', content: clipText, collectionName: currentCollection ? currentCollection.name : null }).then(res => {
+                ipcRenderer.invoke('save-clipboard-item', {
+                    type: urlRegex.test(clipText) ? 'link' : 'text',
+                    content: clipText,
+                    title: clipTitle || undefined,
+                    collectionName: currentCollection ? currentCollection.name : null
+                }).then(res => {
                     if (res.success) {
-                        createClipboardItem(clipText);
+                        // Instead of just createClipboardItem, reload the list from DB
                         newClipTextarea.value = '';
+                        if (currentTitleInput) currentTitleInput.value = '';
+                        loadClipboardItemsFromDB(currentCollection.name);
                         showNotification('Saved to database!');
                     } else {
                         showNotification('DB error: ' + res.error);
                     }
                 });
             } else {
-                createClipboardItem(clipText);
+                createClipboardItem({ type: urlRegex.test(clipText) ? 'link' : 'text', content: clipText, title: clipTitle || undefined });
                 saveClipboardItems();
                 newClipTextarea.value = '';
+                if (currentTitleInput) currentTitleInput.value = '';
             }
         }
     }
