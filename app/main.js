@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, clipboard, shell, nativeImage, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, clipboard, shell, nativeImage, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -16,6 +16,7 @@ app.disableHardwareAcceleration();
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 let tray = null;
+let aiChatWindow = null;
 
 function getValidIcon(iconPath, size = 256) {
   let icon = nativeImage.createFromPath(iconPath);
@@ -144,6 +145,51 @@ function createTray() {
   });
 }
 
+// Create the AI chat window
+function createAIChatWindow() {
+  if (aiChatWindow && !aiChatWindow.isDestroyed()) {
+    aiChatWindow.focus();
+    return;
+  }
+  aiChatWindow = new BrowserWindow({
+    width: 600,
+    height: 380,
+    resizable: true,
+    minimizable: false,
+    maximizable: false,
+    frame: false, // Frameless, no titlebar
+    alwaysOnTop: true, // Always on top
+    skipTaskbar: false,
+    transparent: false,
+    title: 'Chat with AI',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    icon: appIcon,
+  });
+  aiChatWindow.loadFile(path.join(__dirname, 'ai_chat/ai_chat.html'));
+  // Notify main window when chat is opened
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('ai-chat-opened');
+  }
+  aiChatWindow.on('closed', () => {
+    aiChatWindow = null;
+    // Notify main window when chat is closed
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('ai-chat-closed');
+    }
+  });
+}
+
+ipcMain.on('toggle-ai-chat', () => {
+  if (aiChatWindow && !aiChatWindow.isDestroyed()) {
+    aiChatWindow.close();
+  } else {
+    createAIChatWindow();
+  }
+});
+
 // Create the window when the app is ready
 app.whenReady().then(() => {
   // Set the app icon for Linux/Windows
@@ -177,6 +223,15 @@ app.whenReady().then(() => {
         }
       }
     });
+  });
+
+  // Register shortcut for toggling AI chat window
+  globalShortcut.register('Control+Shift+Space', () => {
+    if (aiChatWindow && !aiChatWindow.isDestroyed()) {
+      aiChatWindow.close();
+    } else {
+      createAIChatWindow();
+    }
   });
 
   app.on('activate', () => {

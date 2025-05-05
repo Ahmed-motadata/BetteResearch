@@ -1,6 +1,9 @@
 import { createClipboardItem, loadClipboardItems, loadClipboardItemsFromDB, saveClipboardItems } from './clipboard.js';
 import { showNotification } from '../renderer/utils.js';
 
+
+
+
 document.addEventListener('DOMContentLoaded', function() {
     // Check if running in Electron
     const isElectron = window.navigator.userAgent.toLowerCase().indexOf('electron') > -1;
@@ -210,23 +213,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (oldTitleInput && oldTitleInput.parentNode) {
             oldTitleInput.parentNode.removeChild(oldTitleInput);
         }
-        // Create and insert a new title input above the textarea
-        const newClipTextarea = document.getElementById('new-clip');
-        const newClipTitle = document.createElement('input');
-        newClipTitle.type = 'text';
-        newClipTitle.placeholder = 'Add title (optional)';
-        newClipTitle.className = 'clip-title-input';
-        newClipTitle.style.display = 'block';
-        newClipTitle.style.width = '100%';
-        newClipTitle.style.marginBottom = '4px';
-        newClipTitle.style.fontSize = '13px';
-        newClipTitle.style.border = '1px solid #e0e0e0';
-        newClipTitle.style.borderRadius = '4px';
-        newClipTitle.style.padding = '3px 8px';
-        newClipTitle.style.background = '#fafbfc';
-        newClipTitle.style.color = '#444';
-        newClipTextarea.parentNode.insertBefore(newClipTitle, newClipTextarea);
-        newClipTitle.value = '';
+        // Insert the title input into the .input-row, before the Chat with AI button
+        const inputRow = document.querySelector('.input-row');
+        if (inputRow) {
+            const newClipTitle = document.createElement('input');
+            newClipTitle.type = 'text';
+            newClipTitle.placeholder = 'Add title (optional)';
+            newClipTitle.className = 'clip-title-input';
+            // Remove all inline styles so CSS flexbox applies
+            inputRow.insertBefore(newClipTitle, inputRow.querySelector('#ai-chat-btn'));
+            newClipTitle.value = '';
+        }
     }
 
     async function loadCollections() {
@@ -588,5 +585,65 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Failed to copy text: ', err);
             });
         }
+    }
+
+    // --- Settings Button & Dark Mode ---
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsDropdown = document.getElementById('settings-dropdown');
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+
+    // Show/hide settings dropdown
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsDropdown.classList.toggle('hidden');
+    });
+    // Hide dropdown when clicking outside
+    document.addEventListener('mousedown', (e) => {
+        if (!settingsDropdown.classList.contains('hidden') && !settingsDropdown.contains(e.target) && e.target !== settingsBtn) {
+            settingsDropdown.classList.add('hidden');
+        }
+    });
+    // Dark mode toggle logic
+    function setDarkMode(enabled) {
+        if (enabled) {
+            document.body.classList.add('dark-mode');
+            localStorage.setItem('darkMode', '1');
+        } else {
+            document.body.classList.remove('dark-mode');
+            localStorage.setItem('darkMode', '0');
+        }
+    }
+    darkModeToggle.addEventListener('change', (e) => {
+        setDarkMode(e.target.checked);
+    });
+    // On load, apply dark mode if set
+    if (localStorage.getItem('darkMode') === '1') {
+        darkModeToggle.checked = true;
+        setDarkMode(true);
+    }
+
+    // --- Chat with AI popout toggle ---
+    let aiChatOpen = false;
+    const aiChatBtn = document.getElementById('ai-chat-btn');
+    const aiChatIndicator = aiChatBtn.querySelector('.ai-chat-indicator');
+    if (aiChatBtn && isElectron && ipcRenderer) {
+        aiChatBtn.addEventListener('click', () => {
+            ipcRenderer.send('toggle-ai-chat');
+        });
+        // Set initial indicator color
+        aiChatIndicator.setAttribute('fill', '#ff4136'); // red
+        // Listen for chat window closed event from main process
+        ipcRenderer.on('ai-chat-closed', () => {
+            aiChatIndicator.setAttribute('fill', '#ff4136'); // red
+            aiChatOpen = false;
+        });
+        ipcRenderer.on('ai-chat-opened', () => {
+            aiChatIndicator.setAttribute('fill', '#2ecc40'); // green
+            aiChatOpen = true;
+        });
+        // Listen for shortcut event
+        ipcRenderer.on('toggle-ai-chat-shortcut', () => {
+            ipcRenderer.send('toggle-ai-chat');
+        });
     }
 });
