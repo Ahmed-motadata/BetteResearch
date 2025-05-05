@@ -140,18 +140,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     const reader = new FileReader();
                     reader.onload = function(event) {
                         const imageDataUrl = event.target.result;
-                        if (isElectron && ipcRenderer) {
+                        // Always use the currently open collection (do not fallback to default_collection)
+                        if (isElectron && ipcRenderer && currentCollection && currentCollection.name) {
                             // Extract base64 part for DB
                             const base64 = imageDataUrl.split(',')[1];
-                            // Make sure to pass the current collection name
-                            ipcRenderer.invoke('save-clipboard-item', { 
-                                type: 'image', 
-                                content: imageDataUrl, 
+                            // Get the current title input value (if any)
+                            const currentTitleInput = document.querySelector('.clip-title-input');
+                            const clipTitle = currentTitleInput ? currentTitleInput.value.trim() : '';
+                            ipcRenderer.invoke('save-clipboard-item', {
+                                type: 'image',
+                                content: imageDataUrl,
                                 imageData: base64,
-                                collectionName: currentCollection ? currentCollection.name : 'default_collection'
+                                title: clipTitle || undefined,
+                                collectionName: currentCollection.name
                             }).then(res => {
                                 if (res.success) {
-                                    createClipboardItem({ id: res.item.id, type: 'image', content: imageDataUrl });
+                                    // Always reload the list from DB to show the new image with title bar
+                                    newClipTextarea.value = '';
+                                    if (currentTitleInput) currentTitleInput.value = '';
+                                    loadClipboardItemsFromDB(currentCollection.name);
                                     showNotification('Image saved to clipboard!');
                                 } else {
                                     console.error('Failed to save image:', res.error);
@@ -162,8 +169,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                 showNotification('Error saving image: ' + (err.message || 'Unknown error'));
                             });
                         } else {
-                            createClipboardItem({ type: 'image', content: imageDataUrl });
+                            // For browser mode, use the same logic and pass the title
+                            const currentTitleInput = document.querySelector('.clip-title-input');
+                            const clipTitle = currentTitleInput ? currentTitleInput.value.trim() : '';
+                            createClipboardItem({ type: 'image', content: imageDataUrl, title: clipTitle || undefined });
                             saveClipboardItems();
+                            newClipTextarea.value = '';
+                            if (currentTitleInput) currentTitleInput.value = '';
                             showNotification('Image copied to clipboard!');
                         }
                     };
