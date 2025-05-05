@@ -105,12 +105,10 @@ html, body {
 
 /* Rest of CSS remains the same */
 .overlay-content {
-    padding-top: 4px;
-    overflow-y: auto;
-    flex-grow: 1;
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    height: 100%;
+    min-height: 0;
 }
 
 .clipboard-items, .clipboard-input {
@@ -119,12 +117,10 @@ html, body {
 }
 
 .clipboard-items {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: 300px;
+    flex: 1 1 auto;
     overflow-y: auto;
-    padding-right: 4px;
+    padding: 10px 12px 0 12px;
+    min-height: 0;
 }
 
 .clipboard-item {
@@ -209,33 +205,49 @@ html, body {
 }
 
 .clipboard-input {
+    flex-shrink: 0;
+    padding: 10px 12px 12px 12px;
+    background: #f7f8fa;
+    border-top: 1px solid #e0e0e0;
+}
+
+.input-area {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 8px;
+    margin-top: 10px; /* Add space above the input area (title/text/button) */
 }
 
-.clipboard-input textarea {
-    min-height: 56px;
-    font-size: 14px;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+.clip-title-input {
+    min-width: 120px;
+    max-width: 180px;
+    flex: 0 0 auto;
+}
+
+#new-clip {
+    flex: 1 1 auto;
+    min-height: 36px;
+    max-height: 120px;
     resize: vertical;
-    font-family: inherit;
 }
 
-.clipboard-input button {
-    padding: 6px 0;
-    height: 32px;
-    font-size: 14px;
-    background-color: #222e3a;
-    color: #fff;
+#add-btn {
+    flex: 0 0 auto;
+    margin-left: 4px;
+    height: 36px;
+    padding: 0 18px;
+    font-size: 15px;
     border-radius: 5px;
+    background: #2d7ff9;
+    color: #fff;
+    border: none;
+    font-weight: 600;
     cursor: pointer;
+    transition: background 0.2s;
 }
-
-.clipboard-input button:hover {
-    background-color: #4a86e8;
+#add-btn:hover {
+    background: #1a5fc2;
 }
 
 .restore-button {
@@ -323,8 +335,8 @@ html, body {
     gap: 18px;
     height: 32px;
     border-radius: 12px;
-    margin-top: 0;
-    margin-bottom: 8px;
+    margin-top: 10px;
+    margin-bottom: 5px; /* Increased for more space below the collection bar */
     margin-left: 16px;
     margin-right: 16px;
 }
