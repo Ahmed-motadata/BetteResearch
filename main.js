@@ -13,6 +13,7 @@ app.disableHardwareAcceleration();
 // Keep a global reference of the window object to prevent garbage collection
 let mainWindow;
 let tray = null;
+let aiChatWindow = null;
 
 // Create the clipboard widget window
 function createWindow() {
@@ -72,6 +73,41 @@ function saveWindowBounds() {
     const bounds = mainWindow.getBounds();
     global.windowBounds = bounds;
   }
+}
+
+// Create the AI chat window
+function createAIChatWindow() {
+  if (aiChatWindow && !aiChatWindow.isDestroyed()) {
+    aiChatWindow.focus();
+    return;
+  }
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width } = primaryDisplay.workAreaSize;
+  aiChatWindow = new BrowserWindow({
+    width: 600,
+    height: 380,
+    x: width - 650, // Position near the right edge
+    y: 150,
+    resizable: true,
+    minimizable: false,
+    maximizable: false,
+    frame: false, // Frameless, no titlebar
+    alwaysOnTop: true, // Always on top
+    skipTaskbar: false,
+    transparent: true, // Make window transparent
+    backgroundColor: '#00000000', // Transparent background
+    title: 'Chat with AI',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    icon: path.join(__dirname, 'icon.png'),
+  });
+  aiChatWindow.loadFile(path.join(__dirname, 'app/ai_chat/ai_chat.html'));
+  aiChatWindow.on('closed', () => {
+    aiChatWindow = null;
+  });
 }
 
 // Create system tray
@@ -167,6 +203,16 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+});
+
+// Listen for toggle-ai-chat event from renderer
+const { ipcMain } = require('electron');
+ipcMain.on('toggle-ai-chat', () => {
+  if (aiChatWindow && !aiChatWindow.isDestroyed()) {
+    aiChatWindow.close();
+  } else {
+    createAIChatWindow();
+  }
 });
 
 // Quit when all windows are closed (except on macOS)

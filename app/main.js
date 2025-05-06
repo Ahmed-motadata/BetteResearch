@@ -160,7 +160,7 @@ function createAIChatWindow() {
     frame: false, // Frameless, no titlebar
     alwaysOnTop: true, // Always on top
     skipTaskbar: false,
-    transparent: false,
+    transparent: true,
     title: 'Chat with AI',
     webPreferences: {
       nodeIntegration: true,

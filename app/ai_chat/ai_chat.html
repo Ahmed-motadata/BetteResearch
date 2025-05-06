@@ -7,7 +7,15 @@
     <link rel="stylesheet" href="ai_chat.css">
 </head>
 <body>
-    <div class="chat-container">
+    <div class="chat-surface">
+        <div class="overlay-header">
+            <img src="../../src/icon.png" class="overlay-app-icon" alt="BetteResearch Logo">
+            <span class="overlay-title">BetteResearch AI</span>
+            <div class="overlay-controls" style="margin-left:auto;">
+                <button id="ai-minimize-btn" title="Minimize">&#8211;</button>
+                <button id="ai-close-btn" title="Close">&#10005;</button>
+            </div>
+        </div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input-row">
             <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off" />

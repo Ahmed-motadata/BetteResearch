@@ -445,144 +445,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function createClipboardItem(data) {
-        const MAX_LENGTH = 100;
-        const item = document.createElement('div');
-        item.className = 'clipboard-item' + (data.type === 'link' ? ' link-item' : '');
-        if (data.id) item.dataset.id = data.id;
+    // Clipboard logic is now handled by clipboard.js
+    // Only delegate to clipboard.js functions here
 
-        // Create content wrapper
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'clipboard-item-content';
-        let content = document.createElement('p');
-        let isURL = false;
-        let isImage = false;
-        let text = data;
-        if (typeof data === 'object' && data.type === 'image') {
-            isImage = true;
-        } else if (typeof data === 'object' && data.type === 'link') {
-            isURL = true;
-            text = data.content;
-        } else if (typeof data === 'object' && data.type === 'text') {
-            text = data.content;
-        } else if (typeof data === 'string') {
-            isURL = urlRegex.test(data.trim());
-        }
-        let expanded = false;
-        // Create action buttons
-        const actionButtons = document.createElement('div');
-        actionButtons.className = 'action-buttons';
-        const copyBtn = document.createElement('button');
-        copyBtn.title = "Copy to clipboard";
-        copyBtn.innerHTML = '📋';
-        if (isImage) {
-            copyBtn.addEventListener('click', () => {
-                if (navigator.clipboard && window.ClipboardItem) {
-                    fetch(data.content)
-                        .then(res => res.blob())
-                        .then(blob => {
-                            const item = new ClipboardItem({ [blob.type]: blob });
-                            navigator.clipboard.write([item]);
-                            showNotification('Image copied to clipboard!');
-                        });
-                } else {
-                    showNotification('Image copy not supported in this browser.');
-                }
-            });
-        } else {
-            copyBtn.addEventListener('click', () => copyToClipboard(text));
-        }
-        const deleteBtn = document.createElement('button');
-        deleteBtn.title = "Delete";
-        deleteBtn.innerHTML = '🗑️';
-        deleteBtn.addEventListener('click', async () => {
-            if (isElectron && ipcRenderer && item.dataset.id) {
-                const res = await ipcRenderer.invoke('delete-clipboard-item', item.dataset.id);
-                if (res.success) {
-                    item.remove();
-                } else {
-                    showNotification('Failed to delete from DB: ' + res.error);
-                }
-            } else {
-                item.remove();
-                saveClipboardItems();
-            }
+    // --- Chat with AI popout toggle ---
+    const aiChatBtn = document.getElementById('ai-chat-btn');
+    const aiChatIndicator = aiChatBtn ? aiChatBtn.querySelector('.ai-chat-indicator') : null;
+    if (aiChatBtn && isElectron && ipcRenderer) {
+        aiChatBtn.addEventListener('click', () => {
+            ipcRenderer.send('toggle-ai-chat');
         });
-        // Expand/contract button for long text
-        let expandBtn = null;
-        if (!isImage && !isURL && typeof text === 'string' && text.length > MAX_LENGTH) {
-            expandBtn = document.createElement('button');
-            expandBtn.title = "Expand/Contract";
-            expandBtn.innerHTML = '<span style="font-size:14px;">➕</span>';
-            expandBtn.className = 'expand-contract-btn';
-            expandBtn.addEventListener('click', function() {
-                expanded = !expanded;
-                if (expanded) {
-                    content.textContent = text;
-                    expandBtn.innerHTML = '<span style="font-size:14px;">➖</span>';
-                } else {
-                    content.textContent = text.slice(0, MAX_LENGTH) + '...';
-                    expandBtn.innerHTML = '<span style="font-size:14px;">➕</span>';
-                }
+        if (aiChatIndicator) {
+            aiChatIndicator.setAttribute('fill', '#ff4136'); // red
+            ipcRenderer.on('ai-chat-closed', () => {
+                aiChatIndicator.setAttribute('fill', '#ff4136'); // red
             });
-        }
-        actionButtons.appendChild(copyBtn);
-        if (isURL) {
-            const openBtn = document.createElement('button');
-            openBtn.title = "Open link";
-            openBtn.innerHTML = '🔗';
-            openBtn.addEventListener('click', () => openURL(text));
-            actionButtons.appendChild(openBtn);
-        }
-        if (expandBtn) actionButtons.appendChild(expandBtn);
-        actionButtons.appendChild(deleteBtn);
-        if (isImage) {
-            const img = document.createElement('img');
-            img.src = data.content;
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            img.alt = 'Clipboard Image';
-            content.innerHTML = '';
-            content.appendChild(img);
-        } else if (isURL) {
-            content.innerHTML = `<a href="#" class="clip-link" data-url="${text}">${text}</a>`;
-            item.classList.add('link-item');
-            content.querySelector('a').addEventListener('click', function(e) {
-                e.preventDefault();
-                openURL(this.getAttribute('data-url'));
-            });
-        } else if (typeof text === 'string' && text.length > MAX_LENGTH) {
-            content.textContent = text.slice(0, MAX_LENGTH) + '...';
-        } else {
-            content.textContent = text;
-        }
-        contentWrapper.appendChild(content);
-        item.appendChild(contentWrapper);
-        item.appendChild(actionButtons);
-        clipboardItems.insertBefore(item, clipboardItems.firstChild);
-    }
-
-    function openURL(url) {
-        if (isElectron && ipcRenderer) {
-            // Use Electron's shell.openExternal through IPC
-            ipcRenderer.send('open-url', url);
-            showNotification('Opening link in browser...');
-        } else {
-            // Fallback for browser environment
-            window.open(url, '_blank');
-        }
-    }
-
-    function copyToClipboard(text) {
-        if (isElectron && ipcRenderer) {
-            ipcRenderer.send('copy-to-clipboard', text);
-            showNotification('Copied to clipboard!');
-        } else {
-            navigator.clipboard.writeText(text).then(() => {
-                showNotification('Copied to clipboard!');
-            }).catch(err => {
-                showNotification('Failed to copy. Please try again.');
-                console.error('Failed to copy text: ', err);
+            ipcRenderer.on('ai-chat-opened', () => {
+                aiChatIndicator.setAttribute('fill', '#2ecc40'); // green
             });
         }
     }
@@ -620,30 +499,5 @@ document.addEventListener('DOMContentLoaded', function() {
     if (localStorage.getItem('darkMode') === '1') {
         darkModeToggle.checked = true;
         setDarkMode(true);
-    }
-
-    // --- Chat with AI popout toggle ---
-    let aiChatOpen = false;
-    const aiChatBtn = document.getElementById('ai-chat-btn');
-    const aiChatIndicator = aiChatBtn.querySelector('.ai-chat-indicator');
-    if (aiChatBtn && isElectron && ipcRenderer) {
-        aiChatBtn.addEventListener('click', () => {
-            ipcRenderer.send('toggle-ai-chat');
-        });
-        // Set initial indicator color
-        aiChatIndicator.setAttribute('fill', '#ff4136'); // red
-        // Listen for chat window closed event from main process
-        ipcRenderer.on('ai-chat-closed', () => {
-            aiChatIndicator.setAttribute('fill', '#ff4136'); // red
-            aiChatOpen = false;
-        });
-        ipcRenderer.on('ai-chat-opened', () => {
-            aiChatIndicator.setAttribute('fill', '#2ecc40'); // green
-            aiChatOpen = true;
-        });
-        // Listen for shortcut event
-        ipcRenderer.on('toggle-ai-chat-shortcut', () => {
-            ipcRenderer.send('toggle-ai-chat');
-        });
     }
 });

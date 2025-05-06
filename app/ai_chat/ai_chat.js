@@ -31,4 +31,21 @@ document.addEventListener('DOMContentLoaded', function() {
             sendMessage();
         }
     });
+    // Minimize and close button logic
+    const minimizeBtn = document.getElementById('ai-minimize-btn');
+    const closeBtn = document.getElementById('ai-close-btn');
+    const chatMain = document.querySelector('.chat-main');
+
+    if (minimizeBtn) {
+        minimizeBtn.addEventListener('click', function() {
+            chatMain.style.display = 'none';
+            // Optionally, trigger a custom event or callback for restore
+        });
+    }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+            window.close && window.close(); // For Electron or similar
+            chatMain.style.display = 'none'; // Fallback: just hide
+        });
+    }
 });
